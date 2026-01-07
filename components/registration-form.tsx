@@ -86,6 +86,8 @@ export default function RegistrationForm({ representante }: RegistrationFormProp
   const [showWelcomeVideo, setShowWelcomeVideo] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [cepValid, setCepValid] = useState<boolean | null>(null)
+  const [whatsappValidated, setWhatsappValidated] = useState(false)
+  const [validatingWhatsapp, setValidatingWhatsapp] = useState(false)
 
   const [formData, setFormData] = useState({
     cpf: "",
@@ -314,6 +316,55 @@ export default function RegistrationForm({ representante }: RegistrationFormProp
     }
   }
 
+  const validateWhatsApp = async (phone: string) => {
+    const cleanPhone = phone.replace(/\D/g, "")
+
+    if (cleanPhone.length < 10) {
+      setWhatsappValidated(false)
+      return
+    }
+
+    setValidatingWhatsapp(true)
+
+    try {
+      const phoneWithCountryCode = "55" + cleanPhone
+
+      const response = await fetch(
+        "https://webhook.fiqon.app/webhook/019b97c2-6aed-7162-8a3a-1fd63694ecd6/5fb591d0-1499-4928-9b9f-198abec46afe",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            chat: {
+              phone: phoneWithCountryCode,
+            },
+          }),
+        }
+      )
+
+      const data = await response.json()
+
+      if (data.existe === true) {
+        setWhatsappValidated(true)
+        toast({
+          title: "WhatsApp validado!",
+          description: "Número confirmado com sucesso.",
+        })
+      } else {
+        setWhatsappValidated(false)
+        setErrorMessage("O número informado não possui WhatsApp. Por favor, verifique.")
+        setShowErrorModal(true)
+      }
+    } catch (error) {
+      console.error("Erro ao validar WhatsApp:", error)
+      setWhatsappValidated(false)
+    } finally {
+      setValidatingWhatsapp(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -328,6 +379,13 @@ export default function RegistrationForm({ representante }: RegistrationFormProp
 
     if (cepValid === false) {
       setErrorMessage("CEP inválido! Por favor, verifique o CEP informado e corrija antes de continuar.")
+      setShowErrorModal(true)
+      setLoading(false)
+      return
+    }
+
+    if (!whatsappValidated) {
+      setErrorMessage("Por favor, verifique se o número de WhatsApp é válido antes de continuar.")
       setShowErrorModal(true)
       setLoading(false)
       return
@@ -708,11 +766,20 @@ export default function RegistrationForm({ representante }: RegistrationFormProp
                 <Input
                   id="cell"
                   value={formData.cell}
-                  onChange={(e) => handleInputChange("cell", e.target.value)}
+                  onChange={(e) => {
+                    handleInputChange("cell", e.target.value)
+                    setWhatsappValidated(false)
+                  }}
+                  onBlur={(e) => validateWhatsApp(e.target.value)}
                   placeholder="(00) 00000-0000"
                   maxLength={15}
                   required
+                  disabled={validatingWhatsapp}
+                  className={whatsappValidated ? "border-green-500" : ""}
                 />
+                {validatingWhatsapp && (
+                  <p className="text-sm text-blue-600 font-medium">Validando WhatsApp...</p>
+                )}
               </div>
             </div>
           </CardContent>
